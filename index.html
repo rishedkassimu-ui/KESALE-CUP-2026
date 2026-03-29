@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kesale Cup 2026</title>
+
+<!-- Firebase CDN -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+<style>
+body{margin:0;font-family:Segoe UI;background:#0b6623;color:#fff}
+header{text-align:center;background:#000;padding:15px}
+nav{display:flex;justify-content:center;gap:15px;margin-bottom:20px}
+nav button{background:#00c853;color:#fff;border:none;padding:10px 15px;cursor:pointer;border-radius:5px;font-weight:bold;}
+nav button.active{background:#fff;color:#000}
+.section{padding:20px;display:none}
+.table-container{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-bottom:20px}
+th,td{border:1px solid #fff;padding:8px;text-align:center}
+th{background:#111}
+.card{background:#111;padding:10px;border-radius:10px;margin:5px;text-align:center;cursor:pointer}
+input,button{padding:8px;margin:5px}
+button{background:#00c853;color:#fff;border:none;cursor:pointer;border-radius:5px}
+#adminPanel{display:none;padding:10px;background:#222;margin-top:10px;border-radius:10px}
+</style>
+</head>
+<body>
+
+<header>
+<h1>Kesale Cup 2026 🐄</h1>
+<p><b>Battle for the Cow</b></p>
+<nav>
+<button onclick="openTab('teams')" id="tabTeams" class="active">Teams</button>
+<button onclick="openTab('groups')" id="tabGroups">Groups</button>
+<button onclick="openTab('fixtures')" id="tabFixtures">Fixtures</button>
+<button onclick="openTab('topScorers')" id="tabScorers">Top Scorers</button>
+<button onclick="openTab('cleansheets')" id="tabCleansheets">Cleansheets</button>
+<button onclick="openTab('admin')" id="tabAdmin">Admin</button>
+</nav>
+</header>
+
+<!-- TEAM SECTION -->
+<section class="section" id="teams" style="display:block">
+<h2>Teams</h2>
+<div id="teamCards" class="grid"></div>
+<div id="teamStats"></div>
+</section>
+
+<!-- GROUPS SECTION -->
+<section class="section" id="groups">
+<h2>Group Standings</h2>
+<div id="groupTables"></div>
+</section>
+
+<!-- FIXTURES SECTION -->
+<section class="section" id="fixtures">
+<h2>Fixtures & Results</h2>
+<div id="fixturesList"></div>
+</section>
+
+<!-- TOP SCORERS -->
+<section class="section" id="topScorers">
+<h2>Top Scorers</h2>
+<div id="scorersList"></div>
+</section>
+
+<!-- CLEANSHEETS -->
+<section class="section" id="cleansheets">
+<h2>Top Cleansheets</h2>
+<div id="cleansheetsList"></div>
+</section>
+
+<!-- ADMIN PANEL -->
+<section class="section" id="admin">
+<h2>Admin Login</h2>
+<input type="text" id="adminUser" placeholder="Username">
+<input type="password" id="adminPass" placeholder="Password">
+<button onclick="loginAdmin()">Login</button>
+
+<div id="adminPanel">
+<h3>Edit League</h3>
+<p><b>Add/Edit Match Result</b></p>
+<input placeholder="Team 1" id="mTeam1">
+<input placeholder="Team 2" id="mTeam2">
+<input type="number" placeholder="Score 1" id="mScore1">
+<input type="number" placeholder="Score 2" id="mScore2">
+<button onclick="saveMatch()">Save Match</button>
+
+<p><b>Top Scorer</b></p>
+<input placeholder="Player Name" id="topPlayer">
+<input type="number" placeholder="Goals" id="topGoals">
+<button onclick="saveTopScorer()">Save Top Scorer</button>
+
+<p><b>Cleansheet</b></p>
+<input placeholder="Goalkeeper Name" id="csPlayer">
+<input type="number" placeholder="Cleansheets" id="csScore">
+<button onclick="saveCleansheet()">Save Cleansheet</button>
+</div>
+</section>
+
+<script>
+// ----------------- FIREBASE CONFIG -----------------
+var firebaseConfig = {
+  apiKey: "AIzaSyAdqvG4rf46xvyO28D80W5VrNlCgH3SDnU",
+  authDomain: "kesale-cup.firebaseapp.com",
+  databaseURL: "https://kesale-cup-default-rtdb.firebaseio.com",
+  projectId: "kesale-cup",
+  storageBucket: "kesale-cup.firebasestorage.app",
+  messagingSenderId: "870168178701",
+  appId: "1:870168178701:web:71e044c4fd1d6d9fea6544",
+  measurementId: "G-FFTB4Z4XM4"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ----------------- ADMIN -----------------
+const ADMIN_USER = "ARSHAD";
+const ADMIN_PASS = "DAPROO16";
+function loginAdmin(){
+  const u = document.getElementById("adminUser").value;
+  const p = document.getElementById("adminPass").value;
+  if(u===ADMIN_USER && p===ADMIN_PASS){
+    alert("Welcome Admin");
+    document.getElementById("adminPanel").style.display="block";
+  }else{
+    alert("Wrong credentials");
+  }
+}
+
+// ----------------- DATA -----------------
+let teams = ["LGM","BPA","STAFF","YDL","BHRM","BHMSE","BHSM","RAM"];
+let groupA = ["LGM","BPA","STAFF","YDL"];
+let groupB = ["BHRM","BHMSE","BHSM","RAM"];
+
+// ----------------- TABS -----------------
+function openTab(id){
+  document.querySelectorAll(".section").forEach(s=>s.style.display="none");
+  document.getElementById(id).style.display="block";
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+  document.getElementById("tab"+id.charAt(0).toUpperCase()+id.slice(1)).classList.add("active");
+}
+
+// ----------------- TEAMS -----------------
+function renderTeams(){
+  let html="";
+  teams.forEach(t=>{
+    html+=`<div class='card' onclick='showTeamStats("${t}")'>${t}</div>`;
+  });
+  document.getElementById("teamCards").innerHTML = html;
+}
+
+// ----------------- TEAM STATS -----------------
+function showTeamStats(team){
+  db.ref("matches").once("value").then(snap=>{
+    let data = snap.val()||{};
+    let stats={MP:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,PTS:0};
+    for(let id in data){
+      let m=data[id];
+      if(m.t1===team || m.t2===team){
+        stats.MP++;
+        let s1=m.s1,s2=m.s2;
+        if(m.t1===team){stats.GF+=s1; stats.GA+=s2;}else{stats.GF+=s2; stats.GA+=s1;}
+        if(s1===s2) stats.D++; 
+        else if((m.t1===team && s1>s2)||(m.t2===team && s2>s1)) stats.W++;
+        else stats.L++;
+      }
+    }
+    stats.GD = stats.GF-stats.GA;
+    stats.PTS = stats.W*3 + stats.D;
+    document.getElementById("teamStats").innerHTML=`<h3>${team} Stats</h3>
+    <table>
+    <tr><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th></tr>
+    <tr><td>${stats.MP}</td><td>${stats.W}</td><td>${stats.D}</td><td>${stats.L}</td><td>${stats.GF}</td><td>${stats.GA}</td><td>${stats.GD}</td><td>${stats.PTS}</td></tr>
+    </table>`;
+  });
+}
+
+// ----------------- FIXTURES -----------------
+function renderFixtures(){
+  db.ref("matches").once("value").then(snap=>{
+    let data=snap.val()||{};
+    let html="<h3>All Matches</h3>";
+    for(let id in data){
+      let m=data[id];
+      html+=`<div class='card'>${m.t1} ${m.s1} - ${m.s2} ${m.t2}</div>`;
+    }
+    document.getElementById("fixturesList").innerHTML=html;
+  });
+}
+
+// ----------------- GROUP STANDINGS -----------------
+function renderGroups(){
+  db.ref("matches").once("value").then(snap=>{
+    let data=snap.val()||{};
+    function calcGroup(group){
+      let table={};
+      group.forEach(t=>table[t]={MP:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,PTS:0});
+      for(let id in data){
+        let m=data[id];
+        if(group.includes(m.t1) && group.includes(m.t2)){
+          table[m.t1].MP++; table[m.t2].MP++;
+          table[m.t1].GF+=m.s1; table[m.t1].GA+=m.s2;
+          table[m.t2].GF+=m.s2; table[m.t2].GA+=m.s1;
+          if(m.s1===m.s2){table[m.t1].D++; table[m.t2].D++;}
+          else if(m.s1>m.s2){table[m.t1].W++; table[m.t2].L++;}
+          else {table[m.t1].L++; table[m.t2].W++;}
+        }
+      }
+      for(let t in table){
+        table[t].GD=table[t].GF-table[t].GA;
+        table[t].PTS=table[t].W*3+table[t].D;
+      }
+      return Object.entries(table).sort((a,b)=>b[1].PTS-a[1].PTS);
+    }
+    let html="<div class='table-container'>";
+    [groupA,groupB].forEach((g,i)=>{
+      let t = calcGroup(g);
+      html+=`<h3>Group ${i===0?'A':'B'}</h3><table><tr><th>Team</th><th>MP</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th></tr>`;
+      t.forEach(r=>html+=`<tr><td>${r[0]}</td><td>${r[1].MP}</td><td>${r[1].W}</td><td>${r[1].D}</td><td>${r[1].L}</td><td>${r[1].GF}</td><td>${r[1].GA}</td><td>${r[1].GD}</td><td>${r[1].PTS}</td></tr>`);
+      html+="</table>";
+    });
+    html+="</div>";
+    document.getElementById("groupTables").innerHTML=html;
+  });
+}
+
+// ----------------- PLAYER STATS -----------------
+function renderTopScorers(){
+  db.ref("topScorers").once("value").then(snap=>{
+    let data = snap.val()||{};
+    let arr = Object.entries(data).map(e=>({name:e[0],goals:e[1]}));
+    arr.sort((a,b)=>b.goals-a.goals);
+    arr=arr.slice(0,5);
+    let html="<table><tr><th>Player</th><th>Goals</th></tr>";
+    arr.forEach(p=>html+=`<tr><td>${p.name}</td><td>${p.goals}</td></tr>`);
+    html+="</table>";
+    document.getElementById("scorersList").innerHTML=html;
+  });
+}
+
+function renderCleansheets(){
+  db.ref("cleansheets").once("value").then(snap=>{
+    let data = snap.val()||{};
+    let arr = Object.entries(data).map(e=>({name:e[0],cs:e[1]}));
+    arr.sort((a,b)=>b.cs-a.cs);
+    arr=arr.slice(0,5);
+    let html="<table><tr><th>Goalkeeper</th><th>Cleansheets</th></tr>";
+    arr.forEach(p=>html+=`<tr><td>${p.name}</td><td>${p.cs}</td></tr>`);
+    html+="</table>";
+    document.getElementById("cleansheetsList").innerHTML=html;
+  });
+}
+
+// ----------------- ADMIN SAVE -----------------
+function saveMatch(){
+  const t1=document.getElementById("mTeam1").value;
+  const t2=document.getElementById("mTeam2").value;
+  const s1=parseInt(document.getElementById("mScore1").value);
+  const s2=parseInt(document.getElementById("mScore2").value);
+  if(!t1||!t2||isNaN(s1)||isNaN(s2)) return alert("Enter all match details");
+  db.ref("matches").push({t1,t2,s1,s2}).then(()=>refreshAll());
+}
+
+function saveTopScorer(){
+  const name=document.getElementById("topPlayer").value;
+  const goals=parseInt(document.getElementById("topGoals").value);
+  if(!name||isNaN(goals)) return alert("Enter player and goals");
+  db.ref("topScorers/"+name).set(goals).then(()=>renderTopScorers());
+}
+
+function saveCleansheet(){
+  const name=document.getElementById("csPlayer").value;
+  const cs=parseInt(document.getElementById("csScore").value);
+  if(!name||isNaN(cs)) return alert("Enter player and cleansheets");
+  db.ref("cleansheets/"+name).set(cs).then(()=>renderCleansheets());
+}
+
+// ----------------- REFRESH ALL -----------------
+function refreshAll(){
+  renderTeams();
+  renderGroups();
+  renderFixtures();
+  renderTopScorers();
+  renderCleansheets();
+}
+
+// ----------------- INIT -----------------
+refreshAll();
+</script>
+</body>
+</html>
